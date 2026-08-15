@@ -1,107 +1,123 @@
-# Powerwinner Paper Copy Simulator
+# Powerwinner Late Signal Paper Bot
 
-This is a **paper-only** copy simulator. It does not place real orders.
+**Paper only. No real orders are placed.**
 
-## What it measures
+This bot tests the strongest current Powerwinner hypothesis:
 
-- Powerwinner public trade detection
-- detection latency
-- current public CLOB order book
-- execution across multiple ask/bid levels
-- partial fills
-- average simulated fill price
-- slippage vs Powerwinner
-- crypto taker fees
-- resolved-market PnL
-- virtual cash balance
+> Ignore ordinary copy trading. Use only Powerwinner's **first BUY** in each BTC 5-minute Up/Down market as a directional signal, especially when that first BUY arrives late in the market.
 
-## Speed
+## What is tested simultaneously
 
-Default leader polling:
+Signal thresholds:
 
-`0.10 seconds`
+- first BUY at or after 60 seconds
+- first BUY at or after 75 seconds
+- first BUY at or after 90 seconds
 
-Polymarket currently documents the public Data API `/trades` limit as 200 requests / 10 seconds. A 0.10s interval is 100 requests / 10 seconds, leaving headroom.
+Filters:
 
-The public Market WebSocket is used continuously for order-book updates.
+- `ALL`
+- `MAKER_LIKELY`
 
-## Important limitation
+Execution delays:
 
-A public observer cannot receive Powerwinner's private order events.
+- immediate
+- +1 second
+- +3 seconds
+- +5 seconds
+- +10 seconds
 
-The bot can only react after Powerwinner's executed trade becomes visible through the public Data API. Therefore this measures **copyable performance**, which is exactly what we want.
+That is **30 paper variants** from the same first-trade stream.
 
-## Copy multiplier
+## Execution model
 
-`COPY_MULTIPLIER=1.0`
+Each eligible variant gets a fixed **$10 all-in paper budget**.
 
-means copy the same number of shares.
+The bot:
 
-Use:
+1. keeps the BTC 5m Up/Down order books live over Polymarket Market WebSocket;
+2. detects Powerwinner public trades from the Data API;
+3. accepts only the **first BUY** of each market;
+4. waits the requested delay;
+5. walks the actual visible ask depth;
+6. calculates average fill price;
+7. applies the current crypto taker fee formula;
+8. holds the paper position to resolution;
+9. pays $1/share only if the selected outcome wins.
 
-`COPY_MULTIPLIER=0.1`
+## Important maker note
 
-for 10% of Powerwinner's size.
+`MAKER_LIKELY` is a public-book heuristic.
 
-## Balance modes
+The public Data API does not reveal Powerwinner's private resting order. We classify a first BUY as maker-like when its execution price is close to the current best bid rather than the current best ask.
 
-For pure execution research:
+The `ALL` variants are therefore the most objective benchmark. `MAKER` variants are research filters.
 
-`ENFORCE_BALANCE=false`
+## Hourly Telegram ZIP
 
-This allows an unrestricted virtual portfolio and shows the true theoretical copy result.
+Each hour, after a short settlement grace period:
 
-To test a fixed bankroll:
-
-`ENFORCE_BALANCE=true`
-
-and set:
-
-`INITIAL_BALANCE=100`
-
-or another amount.
-
-## Telegram report
-
-Every completed UTC hour, after a 5-minute delay, Telegram receives a ZIP containing:
-
-- `leader_trades.csv`
-- `copy_attempts.csv`
-- `market_results.csv`
+- `signals.csv`
+- `executions.csv`
+- `results.csv`
+- `hourly_summary.csv`
+- `cumulative_summary.csv`
 - `report.txt`
 
-## Recommended deployment
+The summaries rank all 30 variants by actual paper PnL.
 
-Run this as a **separate Render service/repository** from Wallet Observer.
+## Render setup
 
-Do not replace the Observer. We want both datasets independently.
+Use a **separate repository and separate Render service**.
 
-Add environment variables:
+Upload:
+
+- `main.py`
+- `requirements.txt`
+- `render.yaml`
+- `.env.example`
+- `.gitignore`
+- `README.md`
+
+Build command:
+
+`pip install -r requirements.txt`
+
+Start command:
+
+`python main.py`
+
+Environment variables required:
 
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
 
-For persistent history, mount a disk at:
+Recommended persistent disk:
 
 `/var/data`
 
-## Fee model
+## What to expect in logs
 
-For crypto markets:
+Market discovery:
 
-`fee = shares × 0.07 × price × (1 - price)`
+`MARKET btc-updown-5m-...`
 
-The simulator applies that fee to each simulated fill level.
+WebSocket:
 
-## What to send back to ChatGPT
+`WS connected | assets=...`
 
-After several hours, upload the ZIP reports from Telegram.
+First Powerwinner BUY:
 
-We can compare:
-- Powerwinner price
-- simulated copy price
-- slippage
-- missed/partial fills
-- fees
-- realized PnL
-- copy vs leader economics
+`FIRST BUY btc-updown-5m-... | t=82s | Up @ 0.6900 | MAKER_LIKELY`
+
+Paper variants:
+
+`PAPER T75 ALL +3s | Up | MAKER_LIKELY | price=...`
+
+Settlement:
+
+`RESOLVED ... | winner=Up`
+
+## Research discipline
+
+Do not judge the strategy from 3-5 markets. Let it collect at least dozens of qualified signals. The 75+ / MAKER results that motivated this bot came from a small retrospective sample and must be tested prospectively.
