@@ -26,7 +26,7 @@ load_dotenv()
 
 LEADER_WALLET = os.getenv(
     "LEADER_WALLET",
-    "0xf3531b23b504cf0aed4ff21325232b2a2d496685"
+    "0x13e0d447520ebe7f8eeaf7817211201b2c585204"
 ).lower()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
